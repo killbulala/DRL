@@ -5,12 +5,14 @@
 @File ： dqn.py
 @IDE  ： PyCharm
 """
+import cv2
 import gym
 import torch
 import random
 from torch import nn
-from collections import namedtuple
 import matplotlib.pyplot as plt
+from matplotlib import animation
+from collections import namedtuple
 
 
 Transition = namedtuple('Transition', ('state', 'action', 'reward', 'state_next'))
@@ -117,6 +119,17 @@ class Agent:
         loss.backward()
         self.optim.step()
 
+    def frame2gif(self, frames):
+        plt.figure(figsize=(frames[0].shape[1] / 72, frames[0].shape[0] / 72), dpi=72)
+        patch = plt.imshow(frames[0])
+        plt.axis('off')
+
+        def animate(i):
+            patch.set_data(frames[i])
+
+        anim = animation.FuncAnimation(plt.gcf(), animate, frames=len(frames), interval=50)
+        anim.save('gif_cartpole.gif', writer='pillow')
+
 
 if __name__ == '__main__':
     flag = 'predict'
@@ -161,7 +174,7 @@ if __name__ == '__main__':
                 state = state_next
 
                 if terminal:
-                    print(f'episode : {str(episode+1)} - step : {str(step+1)}')
+                    print(f'episode : {str(episode + 1)} - step : {str(step + 1)}')
                     visual_steps.append(step)
                     break
 
@@ -173,30 +186,29 @@ if __name__ == '__main__':
         plt.plot(visual_steps)
         plt.show()
         torch.save(agent.model.state_dict(), 'dqn_params.pth')
-
-    """predict"""
-    env = gym.make('CartPole-v0')
-    n_states = env.observation_space.shape[0]
-    n_actions = env.action_space.n
-    agent = Agent(n_states, n_actions)
-    # load params
-    state_dict = torch.load('dqn_params.pth')
-    agent.model.load_state_dict(state_dict)
-    agent.model.eval()
-    state = env.reset()
-    state = torch.tensor(state, dtype=torch.float32).unsqueeze(dim=0)
-    terminal = False
-    step = 0
-    while not terminal:
-        action = agent.choose_action(state, episode=0, train_flag=False)
-        state_next, reward, terminal, _ = env.step(action.item())
-        if terminal:
-            break
-        else:
-            step += 1
-            state = torch.tensor(state_next, dtype=torch.float32).unsqueeze(dim=0)
-    print(f'death-step : {step}')
-
-
-
-
+    else:
+        """predict"""
+        env = gym.make('CartPole-v0')
+        n_states = env.observation_space.shape[0]
+        n_actions = env.action_space.n
+        agent = Agent(n_states, n_actions)
+        # load params
+        state_dict = torch.load('dqn_params.pth')
+        agent.model.load_state_dict(state_dict)
+        agent.model.eval()
+        state = env.reset()
+        state = torch.tensor(state, dtype=torch.float32).unsqueeze(dim=0)
+        terminal = False
+        step = 0
+        frames = []
+        while not terminal:
+            frames.append(env.render(mode='rgb_array'))
+            action = agent.choose_action(state, episode=0, train_flag=False)
+            state_next, reward, terminal, _ = env.step(action.item())
+            if terminal:
+                break
+            else:
+                step += 1
+                state = torch.tensor(state_next, dtype=torch.float32).unsqueeze(dim=0)
+        agent.frame2gif(frames)
+        print(f'death-step : {step}')
